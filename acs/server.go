@@ -45,5 +45,8 @@ func (s *Server) ListenAndServe() error {
 }
 
 func (s *Server) Close() error {
+	if s.l == nil {
+		return nil
+	}
 	return s.l.Close()
 }
