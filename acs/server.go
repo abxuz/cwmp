@@ -8,13 +8,22 @@ type Handler interface {
 	ServeAcs(ctx *AcsContext)
 }
 
+type HandleFunc func(ctx *AcsContext)
+
+func (f HandleFunc) ServeAcs(ctx *AcsContext) {
+	f(ctx)
+}
+
 type Server struct {
 	Addr    string
 	Handler Handler
+
+	l net.Listener
 }
 
 func (s *Server) Serve(l net.Listener) error {
-	defer l.Close()
+	s.l = l
+	defer s.Close()
 	for {
 		conn, err := l.Accept()
 		if err != nil {
@@ -33,4 +42,8 @@ func (s *Server) ListenAndServe() error {
 		return err
 	}
 	return s.Serve(l)
+}
+
+func (s *Server) Close() error {
+	return s.l.Close()
 }
