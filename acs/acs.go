@@ -157,6 +157,11 @@ func (ctx *AcsContext) SetParameterValues(req *cwmp.SetParameterValues) (*cwmp.S
 	return resp.(*cwmp.SetParameterValuesResponse), nil
 }
 
+func (ctx *AcsContext) Reboot() error {
+	_, err := ctx.ExchangeMessage(cwmp.NewReboot(), "RebootResponse")
+	return err
+}
+
 func (ctx *AcsContext) Close() error {
 	return ctx.httpCtx.Close()
 }
