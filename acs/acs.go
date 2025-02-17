@@ -162,6 +162,11 @@ func (ctx *AcsContext) Reboot() error {
 	return err
 }
 
+func (ctx *AcsContext) FactoryReset() error {
+	_, err := ctx.ExchangeMessage(cwmp.NewFactoryReset(), "FactoryResetResponse")
+	return err
+}
+
 func (ctx *AcsContext) Close() error {
 	return ctx.httpCtx.Close()
 }
