@@ -1,80 +1,54 @@
 package cwmp
 
 import (
+	"encoding/xml"
 	"strconv"
 )
 
 type SetParameterValues struct {
-	baseMessage
-	ParameterList map[string]*ValueStruct
-	ParameterKey  string
-}
-
-type setParameterValuesBodyStruct struct {
-	Body *setParameterValuesStruct `xml:"cwmp:SetParameterValues"`
-}
-
-type setParameterValuesStruct struct {
-	ParamList    *ParameterListStruct `xml:"ParameterList"`
-	ParameterKey string
-}
-
-type ParameterListStruct struct {
-	Type            string                  `xml:"SOAP-ENC:arrayType,attr"`
-	ParameterValues []*ParameterValueStruct `xml:"ParameterValueStruct"`
-}
-
-type ParameterValueStruct struct {
-	Name  string       `xml:"Name"`
-	Value *ValueStruct `xml:"Value"`
-}
-
-type ValueStruct struct {
-	Type  string `xml:"xsi:type,attr"`
-	Value string `xml:",chardata"`
+	Header          `xml:"-"`
+	ParameterValues []*ParameterValueStruct `xml:"-"`
 }
 
 func NewSetParameterValues() *SetParameterValues {
-	return &SetParameterValues{
-		ParameterList: make(map[string]*ValueStruct),
-	}
+	m := new(SetParameterValues)
+	m.Header.RandomID()
+	return m
 }
 
-func (msg *SetParameterValues) GetName() string {
-	return "SetParameterValues"
+func (m *SetParameterValues) SetParameter(name string, v string, t string) {
+	value := new(ParameterValueStruct)
+	value.Name = name
+	value.Value.Type = t
+	value.Value.Value = v
+	m.ParameterValues = append(m.ParameterValues, value)
 }
 
-func (msg *SetParameterValues) SetParameter(name string, v string, t string) {
-	msg.ParameterList[name] = &ValueStruct{
-		Type:  t,
-		Value: v,
-	}
+type setParameterValuesBody struct {
+	ParameterList struct {
+		Type            string                  `xml:"SOAP-ENC:arrayType,attr"`
+		ParameterValues []*ParameterValueStruct `xml:"ParameterValueStruct,omitempty"`
+	} `xml:"cwmp:SetParameterValues>ParameterList"`
+	ParameterKey string `xml:"cwmp:SetParameterValues>ParameterKey"`
 }
 
-func (msg *SetParameterValues) SetStringParameter(name string, v string) {
-	msg.SetParameter(name, v, XsdString)
+type ParameterValueStruct struct {
+	Name  string `xml:"Name"`
+	Value struct {
+		Type  string `xml:"xsi:type,attr"`
+		Value string `xml:",chardata"`
+	} `xml:"Value"`
 }
 
-func (msg *SetParameterValues) SetUintParameter(name string, v string) {
-	msg.SetParameter(name, v, XsdUnsignedint)
+func (m *SetParameterValues) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
+	body := new(setParameterValuesBody)
+	body.ParameterList.ParameterValues = m.ParameterValues
+	body.ParameterList.Type = "cwmp:ParameterValueStruct[" + strconv.Itoa(len(m.ParameterValues)) + "]"
+	return e.EncodeElement(body, start)
 }
 
-func (msg *SetParameterValues) CreateXML() []byte {
-	body := &setParameterValuesBodyStruct{
-		&setParameterValuesStruct{
-			ParamList:    &ParameterListStruct{},
-			ParameterKey: msg.ParameterKey,
-		},
-	}
-
-	body.Body.ParamList.Type = "cwmp:ParameterValueStruct[" + strconv.Itoa(len(msg.ParameterList)) + "]"
-	body.Body.ParamList.ParameterValues = make([]*ParameterValueStruct, 0)
-	for k, v := range msg.ParameterList {
-		value := &ParameterValueStruct{
-			Name:  k,
-			Value: v,
-		}
-		body.Body.ParamList.ParameterValues = append(body.Body.ParamList.ParameterValues, value)
-	}
-	return marshal(msg.GetID(), body)
+func (m *SetParameterValues) Response() *SetParameterValuesResponse {
+	resp := new(SetParameterValuesResponse)
+	resp.ID = m.ID
+	return resp
 }

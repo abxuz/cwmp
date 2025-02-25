@@ -1,27 +1,19 @@
 package cwmp
 
 type DeleteObject struct {
-	baseMessage
-	deleteObjectStruct
-}
-
-type deleteObjectBodyStruct struct {
-	Body *deleteObjectStruct `xml:"cwmp:DeleteObject"`
-}
-
-type deleteObjectStruct struct {
-	ObjectName   string
-	ParameterKey string
+	Header       `xml:"-"`
+	ObjectName   string `xml:"cwmp:DeleteObject>ObjectName"`
+	ParameterKey string `xml:"cwmp:DeleteObject>ParameterKey"`
 }
 
 func NewDeleteObject() *DeleteObject {
-	return &DeleteObject{}
+	m := new(DeleteObject)
+	m.Header.RandomID()
+	return m
 }
 
-func (msg *DeleteObject) GetName() string {
-	return "DeleteObject"
-}
-
-func (msg *DeleteObject) CreateXML() []byte {
-	return marshal(msg.GetID(), &deleteObjectBodyStruct{&msg.deleteObjectStruct})
+func (m *DeleteObject) Response() *DeleteObjectResponse {
+	resp := new(DeleteObjectResponse)
+	resp.ID = m.ID
+	return resp
 }

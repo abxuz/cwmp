@@ -1,27 +1,19 @@
 package cwmp
 
 type ScheduleInform struct {
-	baseMessage
-	scheduleInformStruct
-}
-
-type scheduleInformBodyStruct struct {
-	Body *scheduleInformStruct `xml:"cwmp:ScheduleInform"`
-}
-
-type scheduleInformStruct struct {
-	CommandKey   string
-	DelaySeconds int
+	Header       `xml:"-"`
+	CommandKey   string `xml:"cwmp:ScheduleInform>CommandKey"`
+	DelaySeconds int    `xml:"cwmp:ScheduleInform>DelaySeconds"`
 }
 
 func NewScheduleInform() *ScheduleInform {
-	return &ScheduleInform{}
+	m := new(ScheduleInform)
+	m.Header.RandomID()
+	return m
 }
 
-func (msg *ScheduleInform) GetName() string {
-	return "ScheduleInform"
-}
-
-func (msg *ScheduleInform) CreateXML() []byte {
-	return marshal(msg.GetID(), &scheduleInformBodyStruct{&msg.scheduleInformStruct})
+func (m *ScheduleInform) Response() *ScheduleInformResponse {
+	resp := new(ScheduleInformResponse)
+	resp.ID = m.ID
+	return resp
 }

@@ -1,9 +1,9 @@
 package acs
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"strconv"
 
@@ -14,10 +14,7 @@ const MaxBodySize = 5 * 1024 * 1024
 
 type AcsContext struct {
 	httpCtx *HttpContext
-}
-
-func NewAcsContext(httpCtx *HttpContext) *AcsContext {
-	return &AcsContext{httpCtx: httpCtx}
+	buffer  *bytes.Buffer
 }
 
 func (ctx *AcsContext) ReadMessage() (cwmp.Message, error) {
@@ -28,26 +25,19 @@ func (ctx *AcsContext) ReadMessage() (cwmp.Message, error) {
 	if req.Method != http.MethodPost {
 		return nil, errors.New("method not allowed")
 	}
+	if req.ContentLength < 0 {
+		return nil, errors.New("chunk body not allowed")
+	}
 	if req.ContentLength > MaxBodySize {
 		return nil, errors.New("max body size limited")
 	}
+
+	// NoContentMessage
 	if req.ContentLength == 0 {
-		return nil, req.Body.Close()
+		return nil, nil
 	}
 
-	var body []byte
-	if req.ContentLength < 0 {
-		body, err = io.ReadAll(io.LimitReader(req.Body, MaxBodySize+1))
-		if err == nil && len(body) > MaxBodySize {
-			err = errors.New("max body size limited")
-		}
-	} else {
-		body, err = io.ReadAll(req.Body)
-	}
-	if err != nil {
-		return nil, err
-	}
-	return cwmp.ParseXML(body)
+	return cwmp.DecodeFrom(req.Body)
 }
 
 func (ctx *AcsContext) WriteMessage(msg cwmp.Message) error {
@@ -58,7 +48,13 @@ func (ctx *AcsContext) WriteMessage(msg cwmp.Message) error {
 		return ctx.httpCtx.Flush()
 	}
 
-	data := msg.CreateXML()
+	ctx.buffer.Reset()
+	err := cwmp.EncodeTo(msg, ctx.buffer)
+	if err != nil {
+		return err
+	}
+	data := ctx.buffer.Bytes()
+
 	fmt.Fprintf(ctx.httpCtx, "HTTP/1.1 %03d %s\r\n", http.StatusOK, http.StatusText(http.StatusOK))
 	ctx.httpCtx.WriteString("Connection: Keep-Alive\r\n")
 	ctx.httpCtx.WriteString("Content-Type: text/xml; charset=UTF-8\r\n")
@@ -67,7 +63,7 @@ func (ctx *AcsContext) WriteMessage(msg cwmp.Message) error {
 	return ctx.httpCtx.Flush()
 }
 
-func (ctx *AcsContext) ExchangeMessage(req cwmp.Message, respType string) (cwmp.Message, error) {
+func (ctx *AcsContext) ExchangeMessage(req cwmp.Message) (cwmp.Message, error) {
 	err := ctx.WriteMessage(req)
 	if err != nil {
 		return nil, err
@@ -78,18 +74,41 @@ func (ctx *AcsContext) ExchangeMessage(req cwmp.Message, respType string) (cwmp.
 		return nil, err
 	}
 
-	if resp == nil {
-		return nil, errors.New("invalid response message")
+	if fault, ok := resp.(*cwmp.Fault); ok {
+		return fault, errors.New(fault.Detail)
 	}
 
-	if resp.GetName() == "Fault" {
-		return nil, errors.New(resp.(*cwmp.Fault).Detail)
+	valid := false
+	switch req.(type) {
+	case *cwmp.GetParameterNames:
+		_, valid = resp.(*cwmp.GetParameterNamesResponse)
+	case *cwmp.GetParameterValues:
+		_, valid = resp.(*cwmp.GetParameterValuesResponse)
+	case *cwmp.SetParameterValues:
+		_, valid = resp.(*cwmp.SetParameterValuesResponse)
+	case *cwmp.AddObject:
+		_, valid = resp.(*cwmp.AddObjectResponse)
+	case *cwmp.DeleteObject:
+		_, valid = resp.(*cwmp.DeleteObjectResponse)
+	case *cwmp.Reboot:
+		_, valid = resp.(*cwmp.RebootResponse)
+	case *cwmp.FactoryReset:
+		_, valid = resp.(*cwmp.FactoryResetResponse)
+	case *cwmp.GetRPCMethods:
+		_, valid = resp.(*cwmp.GetRPCMethodsResponse)
+	case *cwmp.Download:
+		_, valid = resp.(*cwmp.DownloadResponse)
+	case *cwmp.Upload:
+		_, valid = resp.(*cwmp.UploadResponse)
+	case *cwmp.TransferComplete:
+		_, valid = resp.(*cwmp.TransferCompleteResponse)
+	case *cwmp.ScheduleInform:
+		_, valid = resp.(*cwmp.ScheduleInformResponse)
 	}
 
-	if resp.GetName() != respType {
-		return nil, errors.New("invalid response message")
+	if !valid {
+		return nil, errors.New("unexpected response cwmp message")
 	}
-
 	return resp, nil
 }
 
@@ -98,12 +117,11 @@ func (ctx *AcsContext) ReadInform() (*cwmp.Inform, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	if msg == nil || msg.GetName() != "Inform" {
+	inform, ok := msg.(*cwmp.Inform)
+	if !ok {
 		return nil, errors.New("invalid response message")
 	}
-
-	return msg.(*cwmp.Inform), nil
+	return inform, nil
 }
 
 func (ctx *AcsContext) ReadNoContent() error {
@@ -118,7 +136,7 @@ func (ctx *AcsContext) ReadNoContent() error {
 }
 
 func (ctx *AcsContext) AddObject(req *cwmp.AddObject) (*cwmp.AddObjectResponse, error) {
-	resp, err := ctx.ExchangeMessage(req, "AddObjectResponse")
+	resp, err := ctx.ExchangeMessage(req)
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +144,7 @@ func (ctx *AcsContext) AddObject(req *cwmp.AddObject) (*cwmp.AddObjectResponse, 
 }
 
 func (ctx *AcsContext) DeleteObject(req *cwmp.DeleteObject) (*cwmp.DeleteObjectResponse, error) {
-	resp, err := ctx.ExchangeMessage(req, "DeleteObjectResponse")
+	resp, err := ctx.ExchangeMessage(req)
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +152,7 @@ func (ctx *AcsContext) DeleteObject(req *cwmp.DeleteObject) (*cwmp.DeleteObjectR
 }
 
 func (ctx *AcsContext) GetParameterNames(req *cwmp.GetParameterNames) (*cwmp.GetParameterNamesResponse, error) {
-	resp, err := ctx.ExchangeMessage(req, "GetParameterNamesResponse")
+	resp, err := ctx.ExchangeMessage(req)
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +160,7 @@ func (ctx *AcsContext) GetParameterNames(req *cwmp.GetParameterNames) (*cwmp.Get
 }
 
 func (ctx *AcsContext) GetParameterValues(req *cwmp.GetParameterValues) (*cwmp.GetParameterValuesResponse, error) {
-	resp, err := ctx.ExchangeMessage(req, "GetParameterValuesResponse")
+	resp, err := ctx.ExchangeMessage(req)
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +168,7 @@ func (ctx *AcsContext) GetParameterValues(req *cwmp.GetParameterValues) (*cwmp.G
 }
 
 func (ctx *AcsContext) SetParameterValues(req *cwmp.SetParameterValues) (*cwmp.SetParameterValuesResponse, error) {
-	resp, err := ctx.ExchangeMessage(req, "SetParameterValuesResponse")
+	resp, err := ctx.ExchangeMessage(req)
 	if err != nil {
 		return nil, err
 	}
@@ -158,13 +176,21 @@ func (ctx *AcsContext) SetParameterValues(req *cwmp.SetParameterValues) (*cwmp.S
 }
 
 func (ctx *AcsContext) Reboot() error {
-	_, err := ctx.ExchangeMessage(cwmp.NewReboot(), "RebootResponse")
+	_, err := ctx.ExchangeMessage(cwmp.NewReboot())
 	return err
 }
 
 func (ctx *AcsContext) FactoryReset() error {
-	_, err := ctx.ExchangeMessage(cwmp.NewFactoryReset(), "FactoryResetResponse")
+	_, err := ctx.ExchangeMessage(cwmp.NewFactoryReset())
 	return err
+}
+
+func (ctx *AcsContext) GetRPCMethods() ([]string, error) {
+	resp, err := ctx.ExchangeMessage(cwmp.NewGetRPCMethods())
+	if err != nil {
+		return nil, err
+	}
+	return resp.(*cwmp.GetRPCMethodsResponse).Methods, nil
 }
 
 func (ctx *AcsContext) Close() error {

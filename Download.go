@@ -7,35 +7,27 @@ const (
 )
 
 type Download struct {
-	baseMessage
-	downloadStruct
-}
-
-type downloadBodyStruct struct {
-	Body *downloadStruct `xml:"cwmp:Download"`
-}
-
-type downloadStruct struct {
-	CommandKey     string
-	FileType       string
-	URL            string
-	Username       string
-	Password       string
-	FileSize       int
-	TargetFileName string
-	DelaySeconds   int
-	SuccessURL     string
-	FailureURL     string
+	Header         `xml:"-"`
+	CommandKey     string `xml:"cwmp:Download>CommandKey"`
+	FileType       string `xml:"cwmp:Download>FileType"`
+	URL            string `xml:"cwmp:Download>URL"`
+	Username       string `xml:"cwmp:Download>Username"`
+	Password       string `xml:"cwmp:Download>Password"`
+	FileSize       int    `xml:"cwmp:Download>FileSize"`
+	TargetFileName string `xml:"cwmp:Download>TargetFileName"`
+	DelaySeconds   int    `xml:"cwmp:Download>DelaySeconds"`
+	SuccessURL     string `xml:"cwmp:Download>SuccessURL"`
+	FailureURL     string `xml:"cwmp:Download>FailureURL"`
 }
 
 func NewDownload() *Download {
-	return &Download{}
+	m := new(Download)
+	m.Header.RandomID()
+	return m
 }
 
-func (msg *Download) GetName() string {
-	return "Download"
-}
-
-func (msg *Download) CreateXML() []byte {
-	return marshal(msg.GetID(), &downloadBodyStruct{&msg.downloadStruct})
+func (m *Download) Response() *DownloadResponse {
+	resp := new(DownloadResponse)
+	resp.ID = m.ID
+	return resp
 }

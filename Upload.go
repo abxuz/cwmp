@@ -1,31 +1,23 @@
 package cwmp
 
 type Upload struct {
-	baseMessage
-	uploadStruct
-}
-
-type uploadBodyStruct struct {
-	Body *uploadStruct `xml:"cwmp:Upload"`
-}
-
-type uploadStruct struct {
-	CommandKey   string
-	FileType     string
-	URL          string
-	Username     string
-	Password     string
-	DelaySeconds int
+	Header       `xml:"-"`
+	CommandKey   string `xml:"cwmp:Upload>CommandKey"`
+	FileType     string `xml:"cwmp:Upload>FileType"`
+	URL          string `xml:"cwmp:Upload>URL"`
+	Username     string `xml:"cwmp:Upload>Username"`
+	Password     string `xml:"cwmp:Upload>Password"`
+	DelaySeconds int    `xml:"cwmp:Upload>DelaySeconds"`
 }
 
 func NewUpload() *Upload {
-	return &Upload{}
+	m := new(Upload)
+	m.Header.RandomID()
+	return m
 }
 
-func (msg *Upload) GetName() string {
-	return "Upload"
-}
-
-func (msg *Upload) CreateXML() []byte {
-	return marshal(msg.GetID(), &uploadBodyStruct{&msg.uploadStruct})
+func (m *Upload) Response() *UploadResponse {
+	resp := new(UploadResponse)
+	resp.ID = m.ID
+	return resp
 }

@@ -1,10 +1,12 @@
 package cwmp
 
+import "errors"
+
 const (
-	// XsdString string type
-	XsdString string = "xsd:string"
-	// XsdUnsignedint uint type
-	XsdUnsignedint string = "xsd:unsignedInt"
+	XsdTypeString string = "xsd:string"
+	XsdTypeInt    string = "xsd:int"
+	XsdTypeUint   string = "xsd:unsignedInt"
+	XsdTypeBool   string = "xsd:boolean"
 )
 
 const (
@@ -31,4 +33,9 @@ const (
 	EventTransferComplete string = "7 TRANSFER COMPLETE"
 	// EventClientChange custom event client online/offline
 	EventClientChange string = "8 CLIENT CHANGE"
+)
+
+var (
+	ErrInvalidCWMPXML = errors.New("invalid cwmp xml data")
+	ErrNotImplemented = errors.New("not implemented")
 )

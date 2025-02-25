@@ -1,25 +1,18 @@
 package cwmp
 
 type GetRPCMethods struct {
-	baseMessage
-	getRPCMethodsStruct
-}
-
-type getRPCMethodsBodyStruct struct {
-	Body *getRPCMethodsStruct `xml:"cwmp:GetRPCMethods"`
-}
-
-type getRPCMethodsStruct struct {
+	Header `xml:"-"`
+	Body   struct{} `xml:"cwmp:GetRPCMethods"`
 }
 
 func NewGetRPCMethods() *GetRPCMethods {
-	return &GetRPCMethods{}
+	m := new(GetRPCMethods)
+	m.Header.RandomID()
+	return m
 }
 
-func (msg *GetRPCMethods) GetName() string {
-	return "GetRPCMethods"
-}
-
-func (msg *GetRPCMethods) CreateXML() []byte {
-	return marshal(msg.GetID(), &getRPCMethodsBodyStruct{&msg.getRPCMethodsStruct})
+func (m *GetRPCMethods) Response() *GetRPCMethodsResponse {
+	resp := new(GetRPCMethodsResponse)
+	resp.ID = m.ID
+	return resp
 }

@@ -1,25 +1,18 @@
 package cwmp
 
 type FactoryReset struct {
-	baseMessage
-	factoryResetStruct
-}
-
-type factoryResetBodyStruct struct {
-	Body *factoryResetStruct `xml:"cwmp:FactoryReset"`
-}
-
-type factoryResetStruct struct {
+	Header `xml:"-"`
+	Body   struct{} `xml:"cwmp:FactoryReset"`
 }
 
 func NewFactoryReset() *FactoryReset {
-	return &FactoryReset{}
+	m := new(FactoryReset)
+	m.Header.RandomID()
+	return m
 }
 
-func (msg *FactoryReset) GetName() string {
-	return "FactoryReset"
-}
-
-func (msg *FactoryReset) CreateXML() []byte {
-	return marshal(msg.GetID(), &factoryResetBodyStruct{&msg.factoryResetStruct})
+func (m *FactoryReset) Response() *FactoryResetResponse {
+	resp := new(FactoryResetResponse)
+	resp.ID = m.ID
+	return resp
 }

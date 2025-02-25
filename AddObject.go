@@ -1,27 +1,23 @@
 package cwmp
 
 type AddObject struct {
-	baseMessage
-	addObjectStruct
+	Header `xml:"-"`
+	addObjectBody
 }
 
-type addObjectBodyStruct struct {
-	Body *addObjectStruct `xml:"cwmp:AddObject"`
-}
-
-type addObjectStruct struct {
-	ObjectName   string
-	ParameterKey string
+type addObjectBody struct {
+	ObjectName   string `xml:"cwmp:AddObject>ObjectName"`
+	ParameterKey string `xml:"cwmp:AddObject>ParameterKey"`
 }
 
 func NewAddObject() *AddObject {
-	return &AddObject{}
+	msg := new(AddObject)
+	msg.Header.RandomID()
+	return msg
 }
 
-func (msg *AddObject) GetName() string {
-	return "AddObject"
-}
-
-func (msg *AddObject) CreateXML() []byte {
-	return marshal(msg.GetID(), &addObjectBodyStruct{&msg.addObjectStruct})
+func (m *AddObject) Response() *AddObjectResponse {
+	resp := new(AddObjectResponse)
+	resp.ID = m.ID
+	return resp
 }

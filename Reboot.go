@@ -1,26 +1,18 @@
 package cwmp
 
 type Reboot struct {
-	baseMessage
-	rebootStruct
-}
-
-type rebootBodyStruct struct {
-	Body *rebootStruct `xml:"cwmp:Reboot"`
-}
-
-type rebootStruct struct {
-	CommandKey string
+	Header     `xml:"-"`
+	CommandKey string `xml:"cwmp:Reboot>CommandKey"`
 }
 
 func NewReboot() *Reboot {
-	return &Reboot{}
+	m := new(Reboot)
+	m.Header.RandomID()
+	return m
 }
 
-func (msg *Reboot) GetName() string {
-	return "Reboot"
-}
-
-func (msg *Reboot) CreateXML() []byte {
-	return marshal(msg.GetID(), &rebootBodyStruct{&msg.rebootStruct})
+func (m *Reboot) Response() *RebootResponse {
+	resp := new(RebootResponse)
+	resp.ID = m.ID
+	return resp
 }

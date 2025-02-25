@@ -1,43 +1,37 @@
 package cwmp
 
 import (
+	"encoding/xml"
 	"strconv"
 )
 
 type GetParameterValues struct {
-	baseMessage
-	ParameterNames []string
-}
-
-type getParameterValuesBodyStruct struct {
-	Body *getParameterValuesStruct `xml:"cwmp:GetParameterValues"`
-}
-
-type getParameterValuesStruct struct {
-	ParameterNames *parameterNamesStruct `xml:"ParameterNames"`
-}
-
-type parameterNamesStruct struct {
-	Type   string   `xml:"SOAP-ENC:arrayType,attr"`
-	Values []string `xml:"string"`
+	Header         `xml:"-"`
+	ParameterNames []string `xml:"-"`
 }
 
 func NewGetParameterValues() *GetParameterValues {
-	return &GetParameterValues{}
+	m := new(GetParameterValues)
+	m.Header.RandomID()
+	return m
 }
 
-func (msg *GetParameterValues) GetName() string {
-	return "GetParameterValues"
+type getParameterValuesBody struct {
+	ParameterNames struct {
+		Type   string   `xml:"SOAP-ENC:arrayType,attr"`
+		Values []string `xml:"string"`
+	} `xml:"cwmp:GetParameterValues>ParameterNames"`
 }
 
-func (msg *GetParameterValues) CreateXML() []byte {
-	body := &getParameterValuesBodyStruct{
-		&getParameterValuesStruct{
-			&parameterNamesStruct{
-				Type:   XsdString + "[" + strconv.Itoa(len(msg.ParameterNames)) + "]",
-				Values: msg.ParameterNames,
-			},
-		},
-	}
-	return marshal(msg.GetID(), body)
+func (m *GetParameterValues) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
+	body := new(getParameterValuesBody)
+	body.ParameterNames.Type = "cwmp:string[" + strconv.Itoa(len(m.ParameterNames)) + "]"
+	body.ParameterNames.Values = m.ParameterNames
+	return e.EncodeElement(body, start)
+}
+
+func (m *GetParameterValues) Response() *GetParameterValuesResponse {
+	resp := new(GetParameterValuesResponse)
+	resp.ID = m.ID
+	return resp
 }

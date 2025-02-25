@@ -1,7 +1,9 @@
 package acs
 
 import (
+	"bytes"
 	"net"
+	"sync"
 )
 
 type Handler interface {
@@ -15,13 +17,17 @@ func (f HandleFunc) ServeAcs(ctx *AcsContext) {
 }
 
 type Server struct {
-	Addr    string
-	Handler Handler
+	Addr string
 
-	l net.Listener
+	Handler Handler
+	pool    *sync.Pool
+	l       net.Listener
 }
 
 func (s *Server) Serve(l net.Listener) error {
+	s.pool = &sync.Pool{
+		New: func() any { return bytes.NewBuffer(nil) },
+	}
 	s.l = l
 	defer s.Close()
 	for {
@@ -30,8 +36,14 @@ func (s *Server) Serve(l net.Listener) error {
 			return err
 		}
 		go func() {
-			defer conn.Close()
-			s.Handler.ServeAcs(NewAcsContext(NewHttpContext(conn)))
+			ctx := &AcsContext{
+				httpCtx: NewHttpContext(conn),
+				buffer:  s.pool.Get().(*bytes.Buffer),
+			}
+			ctx.buffer.Reset()
+			s.Handler.ServeAcs(ctx)
+			s.pool.Put(ctx.buffer)
+			conn.Close()
 		}()
 	}
 }
