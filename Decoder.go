@@ -14,14 +14,20 @@ type BodyDecoder struct {
 	Message
 }
 
-func (b *BodyDecoder) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
-	t, err := d.Token()
-	if err != nil {
-		return err
-	}
-	start, ok := t.(xml.StartElement)
-	if !ok {
-		return ErrInvalidCWMPXML
+func (b *BodyDecoder) UnmarshalXML(d *xml.Decoder, _ xml.StartElement) error {
+	var start xml.StartElement
+
+	for {
+		t, err := d.Token()
+		if err != nil {
+			return err
+		}
+
+		var ok bool
+		start, ok = t.(xml.StartElement)
+		if ok {
+			break
+		}
 	}
 
 	switch start.Name.Local {
@@ -57,17 +63,26 @@ func (b *BodyDecoder) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error
 		return ErrInvalidCWMPXML
 	}
 
-	err = d.DecodeElement(b.Message, &start)
+	err := d.DecodeElement(b.Message, &start)
 	if err != nil {
 		return err
 	}
 
-	t, err = d.Token()
-	if err != nil {
-		return err
+	var end xml.EndElement
+	for {
+		t, err := d.Token()
+		if err != nil {
+			return err
+		}
+
+		var ok bool
+		end, ok = t.(xml.EndElement)
+		if ok {
+			break
+		}
 	}
-	end, ok := t.(xml.EndElement)
-	if !ok || end.Name.Local != "Body" {
+
+	if end.Name.Local != "Body" {
 		return ErrInvalidCWMPXML
 	}
 	return nil
